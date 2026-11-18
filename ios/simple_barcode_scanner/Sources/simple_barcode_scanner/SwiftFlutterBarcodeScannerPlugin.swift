@@ -308,7 +308,7 @@ class BarcodeScannerViewController: UIViewController {
     
     override public func viewDidLoad() {
         super.viewDidLoad()
-        self.isOrientationPortrait = isLandscape
+        self.isOrientationPortrait = currentInterfaceOrientation.isPortrait
         self.initUIComponents()
     }
     
@@ -699,10 +699,24 @@ class BarcodeScannerViewController: UIViewController {
         layer.videoOrientation = orientation
     }
     
-    var isLandscape: Bool {
-        return UIDevice.current.orientation.isValidInterfaceOrientation
-            ? UIDevice.current.orientation.isPortrait
-            : UIApplication.shared.statusBarOrientation.isPortrait
+    /// The orientation the UI is laid out in. The device orientation can't stand in for it:
+    /// it is faceUp or faceDown while the phone lies flat, and it ignores the orientations
+    /// the app supports. UIApplication.statusBarOrientation stops working once the app
+    /// adopts UIScene, so the window scene is asked instead.
+    var currentInterfaceOrientation: UIInterfaceOrientation {
+        if #available(iOS 13.0, *) {
+            let scene = view.window?.windowScene
+                ?? UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .first(where: { $0.activationState == .foregroundActive })
+            if let orientation = scene?.interfaceOrientation, orientation != .unknown {
+                return orientation
+            }
+            // Screen bounds follow the interface orientation.
+            let bounds = UIScreen.main.bounds
+            return bounds.height >= bounds.width ? .portrait : .landscapeRight
+        }
+        return UIApplication.shared.statusBarOrientation
     }
     
     private func launchApp(decodedURL: String) {
@@ -770,21 +784,16 @@ extension BarcodeScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
 extension BarcodeScannerViewController{
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
-        updateUIAfterRotation()
+        updateUIAfterRotation(to: size)
     }
-    
-    func updateUIAfterRotation(){
+
+    func updateUIAfterRotation(to size: CGSize){
         DispatchQueue.main.async {
-            if UIDevice.current.orientation == .portrait || UIDevice.current.orientation == .portraitUpsideDown {
-                self.isOrientationPortrait = true
-            }else{
-                self.isOrientationPortrait = false
-            }
-            //self.isOrientationPortrait = self.isLandscape
-            
+            self.isOrientationPortrait = size.height >= size.width
+
             self.screenSize = UIScreen.main.bounds
-            
-            if UIDevice.current.orientation == .portrait || UIDevice.current.orientation == .portraitUpsideDown {
+
+            if self.isOrientationPortrait {
                 self.screenHeight = (CGFloat)((SwiftFlutterBarcodeScannerPlugin.scanMode == ScanMode.QR.index) ? (self.screenSize.width * 0.8) : (self.screenSize.width * 0.5))
                 
             } else {
@@ -815,31 +824,17 @@ extension BarcodeScannerViewController{
     
     // Set video preview orientation
     func setVideoPreviewOrientation(){
-        switch(UIDevice.current.orientation){
-        case .unknown:
-            self.videoPreviewLayer?.connection?.videoOrientation = AVCaptureVideoOrientation.portrait
-            break
-        case .portrait:
-            self.videoPreviewLayer?.connection?.videoOrientation = AVCaptureVideoOrientation.portrait
-            break
+        // Interface and video orientations share their landscape naming, unlike the
+        // device orientation, so they map one to one.
+        switch(currentInterfaceOrientation){
         case .portraitUpsideDown:
             self.videoPreviewLayer?.connection?.videoOrientation = AVCaptureVideoOrientation.portraitUpsideDown
-            break
         case .landscapeLeft:
-            self.videoPreviewLayer?.connection?.videoOrientation = AVCaptureVideoOrientation.landscapeRight
-            break
-        case .landscapeRight:
             self.videoPreviewLayer?.connection?.videoOrientation = AVCaptureVideoOrientation.landscapeLeft
-            break
-        case .faceUp:
+        case .landscapeRight:
+            self.videoPreviewLayer?.connection?.videoOrientation = AVCaptureVideoOrientation.landscapeRight
+        default:
             self.videoPreviewLayer?.connection?.videoOrientation = AVCaptureVideoOrientation.portrait
-            break
-        case .faceDown:
-            self.videoPreviewLayer?.connection?.videoOrientation = AVCaptureVideoOrientation.portrait
-            break
-        @unknown default:
-            self.videoPreviewLayer?.connection?.videoOrientation = AVCaptureVideoOrientation.portrait
-            break
         }
     }
     
