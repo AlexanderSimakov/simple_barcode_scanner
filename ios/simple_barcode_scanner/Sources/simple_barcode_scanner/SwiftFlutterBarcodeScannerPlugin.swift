@@ -499,10 +499,12 @@ class BarcodeScannerViewController: UIViewController {
         // Use safe area for bottom constraints to avoid system UI overlap on iOS 11+
         let bottomAnchor = view.safeAreaLayoutGuide.bottomAnchor
 
+        // The buttons sit above the safe area, but the bar's background runs down to the
+        // screen edge, so the camera preview doesn't show through below it.
         bottomView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant:0).isActive = true
-        bottomView.bottomAnchor.constraint(equalTo: bottomAnchor, constant:0).isActive = true
+        bottomView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant:0).isActive = true
         bottomView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant:0).isActive = true
-        bottomView.heightAnchor.constraint(equalToConstant:self.isOrientationPortrait ? 100.0 : 70.0).isActive=true
+        bottomView.topAnchor.constraint(equalTo: bottomAnchor, constant: self.isOrientationPortrait ? -100.0 : -70.0).isActive = true
 
         flashIcon.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
         flashIcon.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10).isActive = true
